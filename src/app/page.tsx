@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Calendar, Clock, CheckCircle, Target, Zap, Award, Activity, User, MapPin, Trophy, ChevronRight, Play, Pause, ChevronDown, Navigation, Timer, Dumbbell, Heart, Menu, X } from 'lucide-react';
+import { Calendar, CheckCircle, Target, Zap, Award, Activity, User, MapPin, Trophy, ChevronRight, ChevronDown, Timer, Dumbbell, Heart, Menu, X } from 'lucide-react';
 
 const MarathonTrainingDashboard = () => {
   const [completedDays, setCompletedDays] = useState({ 'week1-day1': true }); // Mark July 14th as complete
@@ -32,11 +32,12 @@ const MarathonTrainingDashboard = () => {
 
   useEffect(() => {
     setIsClient(true);
-    setTimeUntilRace(getTimeUntilRace());
-    
-    const timer = setInterval(() => {
+    const updateTime = () => {
       setTimeUntilRace(getTimeUntilRace());
-    }, 1000);
+    };
+    updateTime();
+    
+    const timer = setInterval(updateTime, 1000);
     return () => clearInterval(timer);
   }, []);
 
@@ -347,7 +348,7 @@ const MarathonTrainingDashboard = () => {
   };
 
   const navigationItems = [
-    { id: 'today', label: 'Today\'s Workout', icon: Calendar },
+                        { id: 'today', label: 'Today&apos;s Workout', icon: Calendar },
     { id: 'weeks', label: '8 Week Training Plan', icon: Activity },
     { id: 'exercises', label: 'Exercise Guide', icon: Dumbbell },
     { id: 'progress', label: 'Training Progress', icon: Award },
@@ -482,7 +483,7 @@ const MarathonTrainingDashboard = () => {
               style={{ width: `${(getTotalCompletedDays() / 56) * 100}%` }}
             ></div>
             <div className="relative flex justify-between">
-              {Object.entries(trainingPlan).map(([weekNum, week]) => (
+              {Object.entries(trainingPlan).map(([weekNum]) => (
                 <div key={weekNum} className="flex flex-col items-center">
                   <div className={`w-6 md:w-8 h-6 md:h-8 rounded-full border-4 bg-white flex items-center justify-center text-xs md:text-sm font-bold transition-all ${
                     isWeekCompleted(parseInt(weekNum)) 
@@ -835,7 +836,7 @@ const MarathonTrainingDashboard = () => {
         </div>
 
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-8">
-          {Object.entries(trainingPlan).map(([weekNum, week]) => {
+          {Object.entries(trainingPlan).map(([weekNum]) => {
             const completedDaysCount = Object.keys(completedDays).filter(key => 
               key.startsWith(`week${weekNum}-`) && completedDays[key]
             ).length;
@@ -861,7 +862,7 @@ const MarathonTrainingDashboard = () => {
                   <span className="text-slate-600 font-medium text-sm md:text-base">{completedDaysCount}/7 days</span>
                   <span className="text-emerald-600 font-bold">{Math.round(progressPercent)}%</span>
                 </div>
-                <div className="mt-2 text-xs md:text-sm text-slate-500">{week.title}</div>
+                <div className="mt-2 text-xs md:text-sm text-slate-500">{trainingPlan[parseInt(weekNum)].title}</div>
               </div>
             );
           })}
@@ -933,7 +934,7 @@ const MarathonTrainingDashboard = () => {
       <div className="max-w-7xl mx-auto px-4 py-12 md:py-16">
         <div className="text-center bg-gradient-to-r from-emerald-500 to-teal-600 rounded-3xl p-8 md:p-12 text-white shadow-2xl">
           <h2 className="text-3xl md:text-5xl font-bold mb-4 md:mb-6 flex flex-col md:flex-row items-center justify-center gap-3">
-            <span>You've Got This, Micha!</span>
+            <span>You&apos;ve Got This, Micha!</span>
             <Trophy className="w-10 md:w-12 h-10 md:h-12 text-yellow-300" />
           </h2>
           <p className="text-lg md:text-2xl mb-6 md:mb-8 text-emerald-100">
@@ -941,7 +942,7 @@ const MarathonTrainingDashboard = () => {
           </p>
           <div className="bg-white/20 backdrop-blur-sm rounded-2xl px-6 md:px-8 py-4 md:py-6 inline-block">
             <p className="text-lg md:text-xl font-semibold text-yellow-200">
-              "The miracle isn't that I finished. The miracle is that I had the courage to start."
+              &ldquo;The miracle isn&apos;t that I finished. The miracle is that I had the courage to start.&rdquo;
             </p>
             <p className="text-emerald-100 mt-2">- John Bingham</p>
           </div>
