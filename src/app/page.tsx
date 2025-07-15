@@ -104,7 +104,7 @@ const MarathonTrainingDashboard = () => {
         steps: [
           'Kneel on one knee, other foot forward',
           'Press hips forward while keeping torso upright',
-          'Feel stretch in front of back leg\'s hip',
+          'Feel stretch in front of back leg hip',
           'Hold 30-60 seconds per side',
           'Can be done standing against wall for support'
         ],
@@ -290,7 +290,7 @@ const MarathonTrainingDashboard = () => {
       days: [
         { day: 'Monday', activity: '5 km easy', type: 'easy', strength: 'Hip & hamstring stretch', purpose: 'Keep blood flowing' },
         { day: 'Tuesday', activity: 'Rest', type: 'rest', strength: 'Foam roll + mobility', purpose: 'Full recovery' },
-        { day: 'Wednesday', activity: '4×400m @ race pace (4:58/km)', type: 'speed', strength: 'Quick stretch + calf roll', purpose: 'Stay sharp, don\'t tire out' },
+        { day: 'Wednesday', activity: '4×400m @ race pace (4:58/km)', type: 'speed', strength: 'Quick stretch + calf roll', purpose: 'Stay sharp, do not tire out' },
         { day: 'Thursday', activity: 'Rest', type: 'rest', strength: 'Lizard + ITB foam roll', purpose: 'Full relaxation' },
         { day: 'Friday', activity: '4 km jog + 2 strides', type: 'easy', strength: 'Breath work + mobility', purpose: 'Focus and loosen up' },
         { day: 'Saturday', activity: 'REST', type: 'rest', strength: 'Early night, hydrate, carbs', purpose: 'Ready to race' },
@@ -348,7 +348,7 @@ const MarathonTrainingDashboard = () => {
   };
 
   const navigationItems = [
-                        { id: 'today', label: 'Today&apos;s Workout', icon: Calendar },
+    { id: 'today', label: 'Today&apos;s Workout', icon: Calendar },
     { id: 'weeks', label: '8 Week Training Plan', icon: Activity },
     { id: 'exercises', label: 'Exercise Guide', icon: Dumbbell },
     { id: 'progress', label: 'Training Progress', icon: Award },
@@ -510,7 +510,7 @@ const MarathonTrainingDashboard = () => {
           <div className="bg-gradient-to-r from-white to-emerald-50 backdrop-blur-sm rounded-3xl p-6 md:p-8 shadow-2xl border border-emerald-100">
             <div className="flex flex-col md:flex-row md:items-center gap-3 mb-6">
               <Calendar className="w-6 md:w-8 h-6 md:h-8 text-emerald-600" />
-              <h2 className="text-2xl md:text-3xl font-bold text-slate-800">Today's Workout</h2>
+              <h2 className="text-2xl md:text-3xl font-bold text-slate-800">Today&apos;s Workout</h2>
               <div className="bg-emerald-100 text-emerald-700 px-4 py-2 rounded-full text-sm font-semibold inline-flex items-center gap-2">
                 <span>Week {todaysWeek} • Day {todaysDay}</span>
                 <span className="text-emerald-600">• {formatDate(getDateForWeekDay(todaysWeek, todaysDay))}</span>
@@ -562,7 +562,7 @@ const MarathonTrainingDashboard = () => {
                 <div className="bg-gradient-to-br from-emerald-50 to-teal-50 rounded-2xl p-6 shadow-lg border border-emerald-100 h-full">
                   <div className="flex items-center gap-3 mb-4">
                     <Target className="w-5 h-5 text-emerald-600" />
-                    <h3 className="text-xl font-bold text-emerald-700">Today's Purpose</h3>
+                    <h3 className="text-xl font-bold text-emerald-700">Today&apos;s Purpose</h3>
                   </div>
                   <div className="space-y-4">
                     <div>
@@ -604,7 +604,7 @@ const MarathonTrainingDashboard = () => {
         </div>
 
         <div className="flex flex-wrap gap-3 md:gap-4 justify-center mb-8">
-          {Object.entries(trainingPlan).map(([weekNum, week]) => (
+          {Object.entries(trainingPlan).map(([weekNum]) => (
             <button
               key={weekNum}
               onClick={() => setCurrentWeek(parseInt(weekNum))}
