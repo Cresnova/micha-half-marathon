@@ -3,22 +3,183 @@
 import React, { useState, useEffect } from 'react';
 import { Calendar, CheckCircle, Target, Zap, Award, Activity, User, MapPin, Trophy, ChevronRight, ChevronDown, Timer, Dumbbell, Heart, Menu, X } from 'lucide-react';
 
-const MarathonTrainingDashboard = () => {
-  const [completedDays, setCompletedDays] = useState({ 'week1-day1': true }); // Mark July 14th as complete
-  const [currentWeek, setCurrentWeek] = useState(1);
-  const [showExerciseDetails, setShowExerciseDetails] = useState({});
-  const [showNutritionPlan, setShowNutritionPlan] = useState(false);
-  const [activeSection, setActiveSection] = useState('hero');
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+interface CompletedDays {
+  [key: string]: boolean;
+}
+
+interface ExerciseDetails {
+  [key: string]: boolean;
+}
+
+interface Exercise {
+  description: string;
+  steps: string[];
+  image: string;
+}
+
+interface Exercises {
+  stretching: { [key: string]: Exercise };
+  gym: { [key: string]: Exercise };
+}
+
+interface TrainingDay {
+  day: string;
+  activity: string;
+  type: string;
+  strength: string;
+  purpose: string;
+}
+
+interface WeekPlan {
+  title: string;
+  focus: string;
+  days: TrainingDay[];
+}
+
+interface TrainingPlan {
+  [key: number]: WeekPlan;
+}
+
+interface TimeUntilRace {
+  days: number;
+  hours: number;
+  minutes: number;
+  seconds: number;
+  weeks: number;
+}
+
+const MarathonTrainingDashboard: React.FC = () => {
+  const [completedDays, setCompletedDays] = useState<CompletedDays>({ 'week1-day1': true });
+  const [currentWeek, setCurrentWeek] = useState<number>(1);
+  const [showExerciseDetails, setShowExerciseDetails] = useState<ExerciseDetails>({});
+  const [showNutritionPlan, setShowNutritionPlan] = useState<boolean>(false);
+  const [activeSection, setActiveSection] = useState<string>('hero');
+  const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
+  const [loading, setLoading] = useState<boolean>(false);
 
   // Training start date (July 14th, 2025)
   const startDate = new Date('2025-07-14');
   const raceDate = new Date('2025-09-07');
 
+  // ENHANCED PERSISTENCE FUNCTIONS
+  const saveWorkoutProgress = async (progressData: CompletedDays): Promise<void> => {
+    try {
+      console.log('💾 Saving workout progress:', progressData);
+      setLoading(true);
+
+      // Save to localStorage immediately (fallback)
+      localStorage.setItem('marathon_progress', JSON.stringify({
+        progress: progressData,
+        lastUpdated: new Date().toISOString(),
+        version: Date.now()
+      }));
+      console.log('✅ Saved to localStorage');
+
+      // Save to Redis via API
+      const response = await fetch('/api/save-progress', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: 'micha',
+          progress: progressData,
+          timestamp: new Date().toISOString()
+        })
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        console.log('✅ Saved to Redis:', result);
+      } else {
+        console.warn('⚠️ Redis save failed, using localStorage only');
+      }
+
+    } catch (error) {
+      console.error('❌ Save error:', error);
+      // Still keep the local state change
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadWorkoutProgress = async (): Promise<void> => {
+    try {
+      console.log('🔄 Loading workout progress...');
+
+      // Try localStorage first
+      const saved = localStorage.getItem('marathon_progress');
+      if (saved) {
+        const data = JSON.parse(saved);
+        console.log('📱 Loaded from localStorage:', data.progress);
+        setCompletedDays(data.progress);
+      }
+
+      // Try to sync with Redis
+      const response = await fetch('/api/get-progress?userId=micha');
+      if (response.ok) {
+        const data = await response.json();
+        if (data.progress) {
+          console.log('🌐 Synced from Redis:', data.progress);
+          setCompletedDays(data.progress);
+          
+          // Update localStorage with server data
+          localStorage.setItem('marathon_progress', JSON.stringify({
+            progress: data.progress,
+            lastUpdated: data.lastUpdated,
+            version: data.version
+          }));
+        }
+      }
+
+    } catch (error) {
+      console.error('❌ Load error:', error);
+      // Use default state if everything fails
+      setCompletedDays({ 'week1-day1': true });
+    }
+  };
+
+  // ENHANCED TOGGLE DAY FUNCTION
+  const toggleDay = async (week: number, day: number): Promise<void> => {
+    console.log('🚀 toggleDay CALLED!', { week, day, type: typeof week, dayType: typeof day });
+    
+    // Validate inputs
+    if (!week || !day || week < 1 || week > 8 || day < 1 || day > 7) {
+      console.error('❌ Invalid week/day values:', { week, day });
+      alert(`Invalid values: Week ${week}, Day ${day}`);
+      return;
+    }
+
+    const key = `week${week}-day${day}`;
+    console.log('🔑 Toggle key:', key);
+    console.log('📊 Current completedDays before update:', completedDays);
+
+    try {
+      // Update state optimistically
+      setCompletedDays(prev => {
+        console.log('📝 Previous state:', prev);
+        const newState = {
+          ...prev,
+          [key]: !prev[key]
+        };
+        console.log('✅ New state will be:', newState);
+        
+        // Save to persistence layer
+        saveWorkoutProgress(newState);
+        
+        return newState;
+      });
+
+      console.log('🎉 Toggle completed successfully');
+
+    } catch (error) {
+      console.error('❌ Error in toggleDay:', error);
+      alert('Error updating workout. Please try again.');
+    }
+  };
+
   // Calculate time until race
-  const getTimeUntilRace = () => {
+  const getTimeUntilRace = (): TimeUntilRace => {
     const now = new Date();
-    const timeDiff = raceDate - now;
+    const timeDiff = raceDate.getTime() - now.getTime();
     const days = Math.floor(timeDiff / (1000 * 60 * 60 * 24));
     const hours = Math.floor((timeDiff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
     const minutes = Math.floor((timeDiff % (1000 * 60 * 60)) / (1000 * 60));
@@ -27,11 +188,53 @@ const MarathonTrainingDashboard = () => {
     return { days, hours, minutes, seconds, weeks };
   };
 
-  const [timeUntilRace, setTimeUntilRace] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0, weeks: 0 });
-  const [isClient, setIsClient] = useState(false);
+  const [timeUntilRace, setTimeUntilRace] = useState<TimeUntilRace>({ days: 0, hours: 0, minutes: 0, seconds: 0, weeks: 0 });
+  const [isClient, setIsClient] = useState<boolean>(false);
 
+  // ENHANCED CURRENT DAY CALCULATION
+  const getCurrentDay = (): { currentWeek: number; currentDay: number } => {
+    try {
+      const now = new Date();
+      const daysSinceStart = Math.floor((now.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+      
+      console.log('📅 Current date:', now.toDateString());
+      console.log('📅 Start date:', startDate.toDateString());
+      console.log('📅 Days since start:', daysSinceStart);
+      
+      // Handle edge cases
+      if (daysSinceStart < 0) {
+        console.log('⚠️ Before start date, using Week 1 Day 1');
+        return { currentWeek: 1, currentDay: 1 };
+      }
+      
+      const currentWeek = Math.floor(daysSinceStart / 7) + 1;
+      const currentDay = (daysSinceStart % 7) + 1;
+      
+      const result = { 
+        currentWeek: Math.min(Math.max(currentWeek, 1), 8), 
+        currentDay: Math.min(Math.max(currentDay, 1), 7) 
+      };
+      
+      console.log('📊 Calculated current day:', result);
+      return result;
+      
+    } catch (error) {
+      console.error('❌ Error calculating current day:', error);
+      return { currentWeek: 1, currentDay: 1 };
+    }
+  };
+
+  const { currentWeek: todaysWeek, currentDay: todaysDay } = getCurrentDay();
+
+  // COMPONENT MOUNT EFFECTS
   useEffect(() => {
+    console.log('🔍 Component mounted');
+    console.log('📊 Initial completedDays:', completedDays);
+    console.log('📅 Today calculated as:', { todaysWeek, todaysDay });
+    
     setIsClient(true);
+    loadWorkoutProgress();
+    
     const updateTime = () => {
       setTimeUntilRace(getTimeUntilRace());
     };
@@ -41,38 +244,27 @@ const MarathonTrainingDashboard = () => {
     return () => clearInterval(timer);
   }, []);
 
-  const scrollToSection = (sectionId) => {
+  // Debug effect to track state changes
+  useEffect(() => {
+    console.log('🔄 completedDays state updated:', completedDays);
+  }, [completedDays]);
+
+  const scrollToSection = (sectionId: string): void => {
     setActiveSection(sectionId);
     setMobileMenuOpen(false);
     document.getElementById(sectionId)?.scrollIntoView({ behavior: 'smooth' });
   };
 
-  const toggleDay = (week, day) => {
-    const key = `week${week}-day${day}`;
-    setCompletedDays(prev => ({
-      ...prev,
-      [key]: !prev[key]
-    }));
-  };
-
-  const isWeekCompleted = (weekNum) => {
-    return Object.keys(completedDays).filter(key => 
+  const isWeekCompleted = (weekNum: number): boolean => {
+    const completed = Object.keys(completedDays).filter(key => 
       key.startsWith(`week${weekNum}-`) && completedDays[key]
-    ).length === 7;
+    ).length;
+    console.log(`Week ${weekNum} completion: ${completed}/7`);
+    return completed === 7;
   };
-
-  const getCurrentDay = () => {
-    const now = new Date();
-    const daysSinceStart = Math.floor((now - startDate) / (1000 * 60 * 60 * 24));
-    const currentWeek = Math.floor(daysSinceStart / 7) + 1;
-    const currentDay = (daysSinceStart % 7) + 1;
-    return { currentWeek: Math.min(Math.max(currentWeek, 1), 8), currentDay: Math.min(Math.max(currentDay, 1), 7) };
-  };
-
-  const { currentWeek: todaysWeek, currentDay: todaysDay } = getCurrentDay();
 
   // Function to get date for a specific week and day
-  const getDateForWeekDay = (weekNum, dayNum) => {
+  const getDateForWeekDay = (weekNum: number, dayNum: number): Date => {
     const totalDays = (weekNum - 1) * 7 + (dayNum - 1);
     const targetDate = new Date(startDate);
     targetDate.setDate(startDate.getDate() + totalDays);
@@ -80,14 +272,153 @@ const MarathonTrainingDashboard = () => {
   };
 
   // Function to format date
-  const formatDate = (date) => {
+  const formatDate = (date: Date): string => {
     return date.toLocaleDateString('en-US', { 
       month: 'short', 
       day: 'numeric'
     });
   };
 
-  const exercises = {
+  // ENHANCED COMPLETE BUTTON COMPONENT
+  interface CompleteButtonProps {
+    week: number;
+    day: number;
+    size?: 'normal' | 'large';
+    className?: string;
+  }
+
+  const CompleteButton: React.FC<CompleteButtonProps> = ({ week, day, size = 'normal', className = '' }) => {
+    const key = `week${week}-day${day}`;
+    const isCompleted = completedDays[key] || false;
+    
+    console.log(`🔘 Rendering button for ${key}:`, { isCompleted, week, day });
+
+    const handleClick = (e: React.MouseEvent<HTMLButtonElement>): void => {
+      e.preventDefault();
+      e.stopPropagation();
+      console.log('🖱️ BUTTON CLICKED!', { week, day, key });
+      console.log('📍 Current state for this key:', completedDays[key]);
+      
+      if (!week || !day) {
+        console.error('❌ Missing week/day values:', { week, day });
+        return;
+      }
+      
+      toggleDay(week, day);
+    };
+
+    const buttonClass = size === 'large' 
+      ? 'inline-flex items-center gap-3 px-6 md:px-8 py-3 md:py-4 rounded-2xl font-bold text-base md:text-lg'
+      : 'w-12 md:w-16 h-12 md:h-16 rounded-2xl flex items-center justify-center flex-shrink-0';
+
+    const buttonStyle: React.CSSProperties = {
+      position: 'relative',
+      zIndex: 10,
+      pointerEvents: 'auto'
+    };
+
+    return (
+      <button
+        onClick={handleClick}
+        disabled={loading}
+        className={`
+          ${buttonClass}
+          transition-all transform hover:scale-105 
+          disabled:opacity-50 disabled:cursor-not-allowed
+          ${isCompleted
+            ? 'bg-gradient-to-r from-green-500 to-emerald-600 text-white shadow-lg'
+            : 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-lg hover:shadow-xl'
+          }
+          ${className}
+        `}
+        style={buttonStyle}
+        data-testid={`complete-button-${key}`}
+        title={`Toggle completion for Week ${week}, Day ${day}`}
+      >
+        <CheckCircle className={size === 'large' ? 'w-5 md:w-6 h-5 md:h-6' : 'w-6 md:w-8 h-6 md:h-8'} />
+        {size === 'large' && (
+          <span>
+            {loading ? 'Saving...' : isCompleted ? 'Workout Completed! 🎉' : 'Mark as Complete'}
+          </span>
+        )}
+      </button>
+    );
+  };
+
+  // DEBUG PANEL (only show in development)
+  const DebugPanel: React.FC = () => {
+    if (process.env.NODE_ENV !== 'development') return null;
+    
+    return (
+      <div style={{
+        position: 'fixed',
+        top: '10px',
+        right: '10px',
+        background: 'rgba(0,0,0,0.9)',
+        color: 'white',
+        padding: '15px',
+        borderRadius: '8px',
+        fontSize: '11px',
+        maxWidth: '350px',
+        zIndex: 9999,
+        fontFamily: 'monospace'
+      }}>
+        <h4 style={{ margin: '0 0 10px 0', color: '#00ff00' }}>🐛 DEBUG PANEL</h4>
+        <div>📅 Today: Week {todaysWeek}, Day {todaysDay}</div>
+        <div>📊 Start Date: {startDate.toLocaleDateString()}</div>
+        <div>📊 Current Date: {new Date().toLocaleDateString()}</div>
+        <div>📊 Days Since Start: {Math.floor((new Date().getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24))}</div>
+        <div>📊 Loading: {loading.toString()}</div>
+        <div style={{ marginTop: '10px' }}>
+          <strong>Completed Days:</strong>
+          <pre style={{ fontSize: '10px', maxHeight: '100px', overflow: 'auto', margin: '5px 0' }}>
+            {JSON.stringify(completedDays, null, 2)}
+          </pre>
+        </div>
+        <div style={{ marginTop: '10px', display: 'flex', gap: '5px', flexWrap: 'wrap' }}>
+          <button 
+            onClick={() => {
+              console.log('🧪 MANUAL TEST: Toggling Week 1, Day 1');
+              toggleDay(1, 1);
+            }}
+            style={{ background: 'blue', color: 'white', padding: '5px', border: 'none', borderRadius: '3px', fontSize: '10px' }}
+          >
+            Test W1D1
+          </button>
+          <button 
+            onClick={() => {
+              console.log('🧪 MANUAL TEST: Toggling Today');
+              toggleDay(todaysWeek, todaysDay);
+            }}
+            style={{ background: 'green', color: 'white', padding: '5px', border: 'none', borderRadius: '3px', fontSize: '10px' }}
+          >
+            Test Today
+          </button>
+          <button 
+            onClick={() => {
+              console.table(completedDays);
+              console.log('Current state:', { todaysWeek, todaysDay, completedDays });
+            }}
+            style={{ background: 'purple', color: 'white', padding: '5px', border: 'none', borderRadius: '3px', fontSize: '10px' }}
+          >
+            Log State
+          </button>
+          <button 
+            onClick={() => {
+              setCompletedDays({});
+              localStorage.removeItem('marathon_progress');
+              console.log('🧹 Reset all progress');
+            }}
+            style={{ background: 'red', color: 'white', padding: '5px', border: 'none', borderRadius: '3px', fontSize: '10px' }}
+          >
+            Reset All
+          </button>
+        </div>
+      </div>
+    );
+  };
+
+  const exercises: Exercises = {
     stretching: {
       'Myrtl routine': {
         description: 'Hip activation routine targeting glute medius, stabilizers, and hip rotators.',
@@ -192,7 +523,7 @@ const MarathonTrainingDashboard = () => {
     }
   };
 
-  const trainingPlan = {
+  const trainingPlan: TrainingPlan = {
     1: {
       title: 'Foundation Week',
       focus: 'Build base fitness and establish routine',
@@ -299,8 +630,8 @@ const MarathonTrainingDashboard = () => {
     }
   };
 
-  const getActivityColor = (type) => {
-    const colors = {
+  const getActivityColor = (type: string): string => {
+    const colors: { [key: string]: string } = {
       tempo: 'bg-gradient-to-r from-emerald-400 to-teal-500',
       speed: 'bg-gradient-to-r from-red-400 to-pink-500',
       long: 'bg-gradient-to-r from-blue-400 to-cyan-500',
@@ -315,8 +646,8 @@ const MarathonTrainingDashboard = () => {
     return colors[type] || 'bg-gradient-to-r from-gray-400 to-slate-500';
   };
 
-  const getActivityTypeInfo = (type) => {
-    const info = {
+  const getActivityTypeInfo = (type: string): { label: string; description: string } => {
+    const info: { [key: string]: { label: string; description: string } } = {
       tempo: { label: 'Tempo', description: 'Builds lactate threshold' },
       speed: { label: 'Speed', description: 'Improves VO2 max & power' },
       long: { label: 'Long Run', description: 'Builds endurance & mental strength' },
@@ -333,11 +664,11 @@ const MarathonTrainingDashboard = () => {
 
   const todaysWorkout = trainingPlan[todaysWeek]?.days[todaysDay - 1];
 
-  const getTotalCompletedDays = () => {
+  const getTotalCompletedDays = (): number => {
     return Object.values(completedDays).filter(Boolean).length;
   };
 
-  const navigateToExercises = (exerciseName) => {
+  const navigateToExercises = (exerciseName: string): void => {
     scrollToSection('exercises');
     setTimeout(() => {
       setShowExerciseDetails(prev => ({
@@ -347,8 +678,14 @@ const MarathonTrainingDashboard = () => {
     }, 500);
   };
 
-  const navigationItems = [
-    { id: 'today', label: 'Today&apos;s Workout', icon: Calendar },
+  interface NavigationItem {
+    id: string;
+    label: string;
+    icon: React.ComponentType<{ className?: string }>;
+  }
+
+  const navigationItems: NavigationItem[] = [
+    { id: 'today', label: "Today's Workout", icon: Calendar },
     { id: 'weeks', label: '8 Week Training Plan', icon: Activity },
     { id: 'exercises', label: 'Exercise Guide', icon: Dumbbell },
     { id: 'progress', label: 'Training Progress', icon: Award },
@@ -357,6 +694,9 @@ const MarathonTrainingDashboard = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-mint-50 to-emerald-50 text-slate-800">
+      {/* Debug Panel */}
+      <DebugPanel />
+      
       {/* Navigation Header */}
       <nav className="fixed top-0 w-full bg-white/90 backdrop-blur-md border-b border-emerald-100 z-50">
         <div className="max-w-7xl mx-auto px-4 py-4">
@@ -510,7 +850,7 @@ const MarathonTrainingDashboard = () => {
           <div className="bg-gradient-to-r from-white to-emerald-50 backdrop-blur-sm rounded-3xl p-6 md:p-8 shadow-2xl border border-emerald-100">
             <div className="flex flex-col md:flex-row md:items-center gap-3 mb-6">
               <Calendar className="w-6 md:w-8 h-6 md:h-8 text-emerald-600" />
-              <h2 className="text-2xl md:text-3xl font-bold text-slate-800">Today&apos;s Workout</h2>
+              <h2 className="text-2xl md:text-3xl font-bold text-slate-800">Today's Workout</h2>
               <div className="bg-emerald-100 text-emerald-700 px-4 py-2 rounded-full text-sm font-semibold inline-flex items-center gap-2">
                 <span>Week {todaysWeek} • Day {todaysDay}</span>
                 <span className="text-emerald-600">• {formatDate(getDateForWeekDay(todaysWeek, todaysDay))}</span>
@@ -562,7 +902,7 @@ const MarathonTrainingDashboard = () => {
                 <div className="bg-gradient-to-br from-emerald-50 to-teal-50 rounded-2xl p-6 shadow-lg border border-emerald-100 h-full">
                   <div className="flex items-center gap-3 mb-4">
                     <Target className="w-5 h-5 text-emerald-600" />
-                    <h3 className="text-xl font-bold text-emerald-700">Today&apos;s Purpose</h3>
+                    <h3 className="text-xl font-bold text-emerald-700">Today's Purpose</h3>
                   </div>
                   <div className="space-y-4">
                     <div>
@@ -580,17 +920,11 @@ const MarathonTrainingDashboard = () => {
 
             {/* Complete Button */}
             <div className="mt-8 text-center">
-              <button
-                onClick={() => toggleDay(todaysWeek, todaysDay)}
-                className={`inline-flex items-center gap-3 px-6 md:px-8 py-3 md:py-4 rounded-2xl font-bold text-base md:text-lg transition-all transform hover:scale-105 ${
-                  completedDays[`week${todaysWeek}-day${todaysDay}`]
-                    ? 'bg-gradient-to-r from-green-500 to-emerald-600 text-white shadow-lg'
-                    : 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-lg hover:shadow-xl'
-                }`}
-              >
-                <CheckCircle className="w-5 md:w-6 h-5 md:h-6" />
-                {completedDays[`week${todaysWeek}-day${todaysDay}`] ? 'Workout Completed! 🎉' : 'Mark as Complete'}
-              </button>
+              <CompleteButton 
+                week={todaysWeek} 
+                day={todaysDay}
+                size="large"
+              />
             </div>
           </div>
         </section>
@@ -701,16 +1035,10 @@ const MarathonTrainingDashboard = () => {
                     </div>
                     
                     {/* Complete Button */}
-                    <button
-                      onClick={() => toggleDay(currentWeek, index + 1)}
-                      className={`w-12 md:w-16 h-12 md:h-16 rounded-2xl flex items-center justify-center transition-all transform hover:scale-110 flex-shrink-0 ${
-                        completedDays[`week${currentWeek}-day${index + 1}`]
-                          ? 'bg-gradient-to-r from-green-500 to-emerald-600 text-white shadow-lg'
-                          : 'bg-gradient-to-r from-slate-200 to-slate-300 text-slate-600 hover:bg-gradient-to-r hover:from-emerald-500 hover:to-teal-600 hover:text-white'
-                      }`}
-                    >
-                      <CheckCircle className="w-6 md:w-8 h-6 md:h-8" />
-                    </button>
+                    <CompleteButton 
+                      week={currentWeek} 
+                      day={index + 1}
+                    />
                   </div>
                 </div>
               ))}
@@ -934,7 +1262,7 @@ const MarathonTrainingDashboard = () => {
       <div className="max-w-7xl mx-auto px-4 py-12 md:py-16">
         <div className="text-center bg-gradient-to-r from-emerald-500 to-teal-600 rounded-3xl p-8 md:p-12 text-white shadow-2xl">
           <h2 className="text-3xl md:text-5xl font-bold mb-4 md:mb-6 flex flex-col md:flex-row items-center justify-center gap-3">
-            <span>You&apos;ve Got This, Micha!</span>
+            <span>You've Got This, Micha!</span>
             <Trophy className="w-10 md:w-12 h-10 md:h-12 text-yellow-300" />
           </h2>
           <p className="text-lg md:text-2xl mb-6 md:mb-8 text-emerald-100">
@@ -942,7 +1270,7 @@ const MarathonTrainingDashboard = () => {
           </p>
           <div className="bg-white/20 backdrop-blur-sm rounded-2xl px-6 md:px-8 py-4 md:py-6 inline-block">
             <p className="text-lg md:text-xl font-semibold text-yellow-200">
-              &ldquo;The miracle isn&apos;t that I finished. The miracle is that I had the courage to start.&rdquo;
+              "The miracle isn't that I finished. The miracle is that I had the courage to start."
             </p>
             <p className="text-emerald-100 mt-2">- John Bingham</p>
           </div>
